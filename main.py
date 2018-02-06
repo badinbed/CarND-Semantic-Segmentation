@@ -220,8 +220,8 @@ def run():
         fcn_out = layers(layer3, layer4, layer7, num_classes)
         
         # TODO: Train NN using the train_nn function
-        epochs = 20
-        batch_size = 1
+        epochs = 40
+        batch_size = 2
         learning_rate = tf.placeholder(tf.float32, name='learning_rate')
         correct_label = tf.placeholder(tf.int32, [None, None, None, num_classes], name='correct_label')
         
