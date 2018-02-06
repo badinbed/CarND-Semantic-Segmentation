@@ -169,11 +169,10 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param learning_rate: TF Placeholder for learning rate
     """
     sess.run(tf.global_variables_initializer())
-    
+    show_every_n_batches = 10
     print('Start training...')
-    for epoch in range(epochs):
-        print('EPOCH {}'.format(epoch+1), end='', flush=True)
-        count = 0
+    for epoch_i in range(epochs):
+        batch_i = 0
         total_loss = 0
         for image, label in get_batches_fn(batch_size):
             _, loss = sess.run([train_op, cross_entropy_loss], feed_dict={input_image: image, 
@@ -181,8 +180,12 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
                                                                             learning_rate: 0.0001,
                                                                             keep_prob: 0.5})
             total_loss = total_loss + loss
-            count = count + 1
-            print('.', end='', flush=True)
+            batch_i += 1
+            if batch_i % show_every_n_batches == 0:
+                print('Epoch {:>3} Batch {:>4}   train_loss = {:.3f}'.format(
+                    epoch_i+1,
+                    batch_i,
+                    loss))
                                                                             
                                                                             
     pass
@@ -218,7 +221,7 @@ def run():
         
         # TODO: Train NN using the train_nn function
         epochs = 20
-        batch_size = 6
+        batch_size = 1
         learning_rate = tf.placeholder(tf.float32, name='learning_rate')
         correct_label = tf.placeholder(tf.int32, [None, None, None, num_classes], name='correct_label')
         
