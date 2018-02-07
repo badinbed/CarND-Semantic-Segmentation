@@ -57,10 +57,9 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :return: The Tensor for the last layer of output
     """
     
-    # standard deviation for initializing 1x1 convolution layers and transposed convolution
-    stddev_1x1 = 0.001
-    stddev_trans = 0.01
-    l2_rate = 1e-3
+    stddev_1x1 = 0.001 # standard deviation for initializing 1x1 convolution layers
+    stddev_trans = 0.01 # standard deviation for transposed convolution
+    l2_rate = 1e-3 # L2 regularization rate
     
     # scale the output from layer 3 and use 1x1 convolution
     layer3_out_scaled = tf.multiply(vgg_layer3_out, 0.0001, name='pool3_scaled_out')
@@ -94,7 +93,7 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
                                     kernel_regularizer=tf.contrib.layers.l2_regularizer(l2_rate),
                                     name='layer7_1x1')
                                     
-    # upscale layers using transposed convolution and fuse skip connections
+    # upscale layer7 using transposed convolution
     layer7_trans = tf.layers.conv2d_transpose(inputs=layer7_1x1,
                                                 filters=num_classes,
                                                 kernel_size=(4, 4),
@@ -104,8 +103,10 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
                                                 kernel_regularizer=tf.contrib.layers.l2_regularizer(l2_rate),
                                                 name='layer7_trans');
                                                
+    # fuse upscaled layer7 output with layer4 1x1 convolution output                                        
     layer7_trans_skip4 = tf.add(layer7_trans, layer4_1x1, name='layer7_trans_skip4')
     
+    # upscale the fused layer
     layer7_trans_skip4_trans = tf.layers.conv2d_transpose(inputs=layer7_trans_skip4,
                                                             filters=num_classes,
                                                             kernel_size=(4, 4),
@@ -114,9 +115,11 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
                                                             kernel_initializer=tf.truncated_normal_initializer(stddev=stddev_trans),
                                                             kernel_regularizer=tf.contrib.layers.l2_regularizer(l2_rate),
                                                             name='layer7_trans_skip4_trans');
-                                                            
+            
+    # fuse the upscaled layer with the layer3 1x1 convolution output  
     layer7_trans_skip4_trans_skip3 = tf.add(layer7_trans_skip4_trans, layer3_1x1, name='layer7_trans_skip4_trans_skip3')
     
+    # upscale to the final layer fcn8 output
     fcn_out = tf.layers.conv2d_transpose(inputs=layer7_trans_skip4_trans_skip3,
                                         filters=num_classes,
                                         kernel_size=(16, 16),
@@ -140,13 +143,16 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     :return: Tuple of (logits, train_op, cross_entropy_loss)
     """
     
+    # reshape last layer output and labels from 4D to 2D
     logits = tf.reshape(nn_last_layer, (-1, num_classes))
     labels = tf.reshape(correct_label, (-1, num_classes))
     
+    # calculate loss from softmax cross entropy and the regularization loss
     cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=labels))
     regularization_loss = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
     cross_entropy_loss += sum(regularization_loss)
     
+    # us adam to minmize the loss
     train_op = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cross_entropy_loss)
     
     return logits, train_op, cross_entropy_loss
@@ -219,8 +225,8 @@ def run():
         input_image, keep_prob, layer3, layer4, layer7 = load_vgg(sess, vgg_path)
         fcn_out = layers(layer3, layer4, layer7, num_classes)
         
-        # TODO: Train NN using the train_nn function
-        epochs = 40
+        # Train NN using the train_nn function
+        epochs = 10
         batch_size = 2
         learning_rate = tf.placeholder(tf.float32, name='learning_rate')
         correct_label = tf.placeholder(tf.int32, [None, None, None, num_classes], name='correct_label')
